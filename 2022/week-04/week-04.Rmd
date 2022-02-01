@@ -60,7 +60,7 @@ df <- ratings_1990 %>%
 
 ```{r}
 library(showtext)
-font_add_google(name = "Roboto Condensed", family = "roboto condensed")
+# font_add_google(name = "Roboto Condensed", family = "roboto condensed")
 font_add_google("Racing Sans One")
 showtext_opts(dpi = 120)
 showtext_auto(enable = TRUE)
