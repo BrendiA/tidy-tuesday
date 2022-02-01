@@ -1,0 +1,122 @@
+---
+title: "data"
+author: "Brendi Ang"
+date: "30/01/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(stringr)
+library(showtext)
+```
+
+```{r}
+# Read-in data
+tuesdata <- tidytuesdayR::tt_load("2022-01-25")
+details <- tuesdata$details
+ratings <- tuesdata$ratings
+```
+
+```{r}
+# Monopoly, Risk and Scrabble
+selected <- ratings %>%
+  filter(
+    str_detect(name, "Monopoly") |
+    str_detect(name, "^\\bRisk\\b") |
+    # Clue in the North America, Cluedo for the rest of the world
+    str_detect(name, "^\\bClue\\b") |
+    str_detect(name, "^\\bCluedo\\b") |
+    str_detect(name, "Scrabble")
+  ) %>%
+  filter(name != "Risk 'n' Roll 2000") %>% 
+  distinct(name) %>%
+  pull()
+```
+
+```{r}
+# 1990s to present
+ratings_1990 <- ratings %>%
+  filter(between(year, 1990, max(year))) %>% 
+  mutate(decade = case_when( 
+    between(year, 1990, 1999) ~ "1990 - 1999",
+    between(year, 2000, 2009) ~ "2000 - 2009",
+    between(year, 2010, 2019) ~ "2010 - 2019",
+    between(year, 2020, max(year)) ~ "2020 - present")) 
+
+# Monopoly, risk and scrabble
+df <- ratings_1990 %>% 
+  filter(name %in% selected) %>% 
+  mutate(selected = case_when(
+    str_detect(name, "Monopoly") ~ "Monopoly",
+    str_detect(name, "^\\bRisk\\b") ~ "Risk",
+    str_detect(name, "^\\bClue\\b") ~ "Clue/Cluedo",
+    str_detect(name, "^\\bCluedo\\b") ~ "Clue/Cluedo",
+    str_detect(name, "Scrabble") ~ "Scrabble"
+  ))
+```
+
+```{r}
+library(showtext)
+font_add_google(name = "Roboto Condensed", family = "roboto condensed")
+font_add_google("Racing Sans One")
+showtext_opts(dpi = 120)
+showtext_auto(enable = TRUE)
+```
+
+```{r}
+# Create jitter object for reproducible jitter
+jitter = position_jitter(seed = 2022,
+                         width = 0.1, 
+                         height = 0)
+
+ggplot(data = ratings_1990,
+       aes(x = 1, y = average),) +
+  geom_point(position = jitter,
+             colour = "grey80",
+             alpha = 0.2,
+             size = 2) +
+  geom_point(data = df,
+             aes(colour = selected),
+             position = jitter,
+             alpha = 0.8,
+             size = 2.2) +
+  scale_colour_manual(values = c("#d9c45c", "#0c84a4", "#cc442c", "#8cdcd4")) +
+  facet_wrap(~ decade, nrow = 2) +
+  # Themes, scales etc
+  theme_minimal() +
+  labs(x = "",
+       y = "Average Score",
+       colour = "Games",
+       title = "Average Scores of Nostalgic Games",
+       subtitle = "Against games produced in the same decade",
+       caption = "Source: Board Games Geek | #TidyTuesday 2022 week 4") +
+  theme(
+    axis.text = element_text(colour = "white"),
+    axis.title = element_text(colour = "white", family = "Racing Sans One", size = 30),
+    axis.title.x.bottom = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.x.bottom = element_blank(),
+    legend.key = element_rect(fill = "#592d86", colour = "#592d86"),
+    legend.position = "bottom",
+    legend.text = element_text(colour = "white", size = 20),
+    legend.title = element_text(colour = "white", face = "bold.italic", size = 25),
+    panel.grid.major.x = element_blank(), 
+    panel.grid.minor.x = element_blank(), 
+    panel.grid.minor.y = element_blank(),
+    panel.grid.major.y = element_line(colour = "white", size = 0.3, linetype = "dashed"),
+    plot.background = element_rect(fill = "#592d86"), # #02385a
+    plot.caption = element_text(colour = "white", hjust = 0.99, family = "Regular 400", size = 20),
+    plot.subtitle = element_text(colour = "white", hjust = 0.5, size = 20, family = "Racing Sans One"),
+    strip.text = element_text(colour = "white", family = "Regular 400", size = 20),
+    plot.title = element_text(family = "Racing Sans One", colour = "white", hjust = 0.5, size = 30)
+    ) 
+```
+
+```{r, eval=FALSE}
+ggsave("week-04-plot.png", width = 8, height = 6, units = "in")
+```
+
+
