@@ -171,11 +171,7 @@ plot_terrier <- function(breed){
               family = "Bold 700", size = 5) +
     coord_polar() +
     theme_void() 
-    
-  
 }
-
-plot_terrier("Yorkshire Terriers")
 ```
 
 ```{r}
@@ -212,8 +208,6 @@ plot_terrier_main <- function(breed){
     
   
 }
-
-plot_terrier_main("West Highland White Terriers")
 ```
 
 
@@ -227,15 +221,12 @@ top_10 <- breed_rank %>%
   right_join(top_10, by = "breed") %>% 
   arrange(rank_2020)
 
-for (i in 1:10){
-  
-  assign(paste0("p", i),
-         plot_terrier(unique(top_10$breed)[i]),
-         envir = .GlobalEnv)
-}
+# Save all plots as a list
+p <- purrr::map(.x = unique(top_10$breed), .f = plot_terrier)
 ```
 
 ```{r}
+# Main plot
 main <- plot_terrier_main("West Highland White Terriers")
 ```
 
@@ -248,54 +239,13 @@ AAEFG
 AAHIJ
 " 
 
-main + p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 +
-  plot_layout(design = layout)
+main + p[[1]] + p[[2]] + p[[3]] + p[[4]] + p[[5]] + p[[6]] + p[[7]] + p[[8]] + p[[9]] +
+  plot_layout(design = layout, guides = "collect") & theme(legend.position = "bottom")
+```
+
+```{r}
+ggsave("week-05-plot.png", width = 8, height = 6, units = "in")
 ```
 
 
 
-
-
-```{r, eval=FALSE}
-# Extract middle element of each group
-label_data <- terrier_traits_long %>% group_by(breed, trait) %>% slice(ceiling(n()/2)) %>% ungroup()
-
-# Control angle in plot
-label_data <- label_data %>% mutate(
-  angle = case_when(
-    trait == "Personable" ~ 0, 
-    trait == "Affectionate" ~ -90,
-    trait == "Child-friendly" ~ 0,
-    trait == "Dog-friendly" ~ 90
-  ),
-  hjust = case_when(
-    trait == "Personable" ~ -0.5, 
-    trait == "Affectionate" ~ -0.5,
-    trait == "Child-friendly" ~ 1.2,
-    trait == "Dog-friendly" ~ -0.5
-  ),
-  vjust = case_when(
-    trait == "Personable" ~ -1, 
-    trait == "Affectionate" ~ -0.5,
-    trait == "Child-friendly" ~ 0,
-    trait == "Dog-friendly" ~ 2 
-  )
-) 
-  
-
-# Create plot that includes trait name
-plot_terrier_main <- function(breed){
-  
-  label_data <- label_data %>% filter(breed == {{breed}})
-  
-  plot_terrier({{breed}}) + 
-    geom_text(data = label_data, aes(x = id + id2, y = 4 - 0.6, label = trait),
-              size = 3, 
-              angle = label_data$angle,
-              hjust = label_data$hjust,
-              vjust = label_data$vjust) 
-  
-}
-
-plot_terrier_main("West Highland White Terriers")
-```
