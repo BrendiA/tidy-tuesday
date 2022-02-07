@@ -9,10 +9,10 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
-library(janitor)
 library(ggimage)
+library(janitor)
 library(patchwork)
-library(tidytuesdayR)
+library(showtext)
 ```
 
 ```{r, include=FALSE}
@@ -21,6 +21,8 @@ breed_traits <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidy
 trait_description <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/trait_description.csv')
 breed_rank <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_rank.csv')
 ```
+
+## Data wrangling
 
 ```{r}
 # --- Clean data
@@ -62,7 +64,7 @@ terrier_traits <- terrier_traits %>%
          "Personable" = openness_to_strangers)
 
 # Select top 11 terrier breeds (including Westie)
-top_11 <- breed_rank %>%
+terrier_rank <- breed_rank %>%
   select(breed, rank_2020, image) %>% 
   filter(str_detect(breed, regex("terrier", ignore_case = TRUE))) %>% 
   slice_min(rank_2020, n = 11) %>% 
@@ -70,9 +72,11 @@ top_11 <- breed_rank %>%
 
 # Include image URL 
 terrier_traits <- terrier_traits %>% 
-  filter(breed %in% unique(top_11$breed)) %>% 
-  left_join(top_11, by = "breed") 
+  filter(breed %in% unique(terrier_rank$breed)) %>% 
+  left_join(terrier_rank, by = "breed") 
 ```
+
+## Prepare dataset for plotting
 
 ```{r}
 # Long format for plotting
@@ -113,33 +117,12 @@ terrier_traits_long <- terrier_traits_long %>%
 ```
 
 ```{r}
-# --- Label data for geom_text()
-
-# Extract middle element of each group
-label_data <- terrier_traits_long %>% group_by(breed, trait) %>% slice(ceiling(n()/2)) %>% ungroup()
-
-# Control angle in plot
-label_data <- label_data %>% mutate(angle = case_when(
-  trait == "Personable" ~ 20,
-  trait == "Affectionate" ~ -80,
-  trait == "Child-friendly" ~ 15,
-  trait == "Dog-friendly" ~ 100
-))
-```
-
-```{r}
 # Create data to plot geom_segment
 df <- tibble(y = seq(from = 1, to = 4, by = 1))
 ```
 
-```{r, message=FALSE}
-library(showtext)
-sysfonts::font_add_google(name = "Dancing Script", family = "Bold 700")
-showtext_opts(dpi = 120)
-showtext_auto(enable = TRUE)
-```
-
 ```{r}
+# Create fill variable for the plot's legend
 terrier_traits_long <- terrier_traits_long %>% 
   mutate(fill = case_when(
     trait == "Affectionate" ~ "#c04b3f",
@@ -149,6 +132,16 @@ terrier_traits_long <- terrier_traits_long %>%
   ))
 ```
 
+## Plotting 
+
+```{r, message=FALSE}
+library(showtext)
+sysfonts::font_add_google(name = "Dancing Script", family = "Bold 700")
+sysfonts::font_add_google(name = "EB Garamond", family = "Medium 500")
+sysfonts::font_add_google(name = "Domine", family = "Semi-bold 600")
+showtext_opts(dpi = 120)
+showtext_auto(enable = TRUE)
+```
 
 ```{r}
 # Create plot for each breed (no trait name)
@@ -167,7 +160,7 @@ plot_terrier <- function(breed){
     # Dog breed
     geom_image(aes(x = 0, y = 0, image = image), size = 0.5) +
     # Dog breed name
-    geom_text(data = distinct(terrier_traits_long, breed), aes(x = -0.2, y = 0, label = {{breed}}), vjust = -8,
+    geom_text(data = distinct(terrier_traits_long, breed), aes(x = -0.2, y = 0, label = {{breed}}), vjust = -7,
               family = "Bold 700", size = 5) +
     coord_polar() +
     theme_void() 
@@ -195,7 +188,7 @@ plot_terrier_main <- function(breed){
     geom_image(aes(x = 0, y = 0, image = image), size = 0.5) +
     # Dog breed name
     geom_text(data = distinct(terrier_traits_long, breed), aes(x = -0.2, y = 0, label = {{breed}}), vjust = -7.5,
-              family = "Bold 700", size = 5) +
+              family = "Bold 700", size = 9) +
     coord_polar() +
     theme_void() +
     # Themes, scales etc.
@@ -205,8 +198,6 @@ plot_terrier_main <- function(breed){
                                  "Dog-friendly" = "#9c53a8",
                                  "Personable" = "#b78e3e")) +
     theme(legend.position = "bottom")
-    
-  
 }
 ```
 
@@ -230,7 +221,7 @@ p <- purrr::map(.x = unique(top_10$breed), .f = plot_terrier)
 main <- plot_terrier_main("West Highland White Terriers")
 ```
 
-```{r, eval=FALSE}
+```{r}
 library(patchwork)
 
 layout <- "
@@ -239,8 +230,23 @@ AAEFG
 AAHIJ
 " 
 
-main + p[[1]] + p[[2]] + p[[3]] + p[[4]] + p[[5]] + p[[6]] + p[[7]] + p[[8]] + p[[9]] +
+# Add layout
+pp <- main + p[[1]] + p[[2]] + p[[3]] + p[[4]] + p[[5]] + p[[6]] + p[[7]] + p[[8]] + p[[9]] +
   plot_layout(design = layout, guides = "collect") & theme(legend.position = "bottom")
+
+# Add Annotations
+pp <- pp + plot_annotation(title = "Are Terriers great companions?",
+                           subtitle = "Ratings are based on a scale of 1 (low) to 5 (high) bones",
+                           caption = "Source: American Kennel Club, courtesy of @KKakey | #TidyTuesday 2022 week 5")
+
+# Add themes
+pp & theme(
+  legend.text = element_text(size = 12, family = "Medium 500"),
+  legend.title = element_text(size = 18, family = "Medium 500", face = "bold.italic"),
+  plot.title = element_text(family = "Semi-bold 600", size = 33, vjust = -25, hjust = 0.02, face = "bold"),
+  plot.subtitle = element_text(family = "Semi-bold 600", size = 15, vjust = -55, hjust = 0.07),
+  plot.caption = element_text(size = 15, family = "Medium 500")
+  )
 ```
 
 ```{r}
