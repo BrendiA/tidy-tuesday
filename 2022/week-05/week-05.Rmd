@@ -1,0 +1,301 @@
+---
+title: "#TidyTuesday week-05"
+author: "Brendi Ang"
+date: "01/02/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(janitor)
+library(ggimage)
+library(patchwork)
+library(tidytuesdayR)
+```
+
+```{r, include=FALSE}
+# Read-in data
+breed_traits <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_traits.csv') 
+trait_description <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/trait_description.csv')
+breed_rank <- read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2022/2022-02-01/breed_rank.csv')
+```
+
+```{r}
+# --- Clean data
+
+breed_traits <- breed_traits %>% 
+  janitor::clean_names() %>% 
+  # Remove repeated white space inside string
+  mutate(breed = str_squish(breed)) 
+
+trait_description <- trait_description %>% 
+  janitor::clean_names()
+
+# Rename year columns to rank_2013, rank_2014, ... 
+breed_rank <- breed_rank %>% 
+  janitor::clean_names() %>%
+  rename_with(.cols = matches("^x"),
+              .fn = ~ str_replace(.,
+                                  pattern = "x(\\d+)_(rank)",
+                                  replacement = "\\2_\\1"))
+```
+
+```{r}
+# Select certain traits
+terrier_traits <- breed_traits %>%  
+  filter(str_detect(breed, regex("terrier", ignore_case = TRUE))) %>% 
+  select(
+    breed,
+    affectionate_with_family,
+    good_with_young_children,
+    good_with_other_dogs,
+    openness_to_strangers
+  )
+
+# Modify (shorten) names of traits
+terrier_traits <- terrier_traits %>% 
+  rename("Affectionate" = affectionate_with_family, 
+         "Child-friendly" = good_with_young_children,
+         "Dog-friendly" = good_with_other_dogs,
+         "Personable" = openness_to_strangers)
+
+# Select top 11 terrier breeds (including Westie)
+top_11 <- breed_rank %>%
+  select(breed, rank_2020, image) %>% 
+  filter(str_detect(breed, regex("terrier", ignore_case = TRUE))) %>% 
+  slice_min(rank_2020, n = 11) %>% 
+  select(-rank_2020)
+
+# Include image URL 
+terrier_traits <- terrier_traits %>% 
+  filter(breed %in% unique(top_11$breed)) %>% 
+  left_join(top_11, by = "breed") 
+```
+
+```{r}
+# Long format for plotting
+terrier_traits_long <- terrier_traits %>% 
+  pivot_longer(cols = Affectionate:Personable,
+               names_to = "trait",
+               values_to = "rating") %>% 
+  mutate(trait = factor(trait)) %>% 
+  relocate(image, .after = rating)
+```
+
+```{r}
+# Read-in bones images
+bones <- tibble(trait = unique(terrier_traits_long$trait),
+                bone = paste0(here::here("2022/week-05/images/"), "bone-", c(1:4), ".png"))
+
+terrier_traits_long <- terrier_traits_long %>% 
+  left_join(bones, by = "trait")
+```
+
+```{r}
+# Create id column for each trait 
+terrier_traits_long <- terrier_traits_long %>% 
+  group_by(breed) %>% 
+  mutate(id = row_number()) %>% 
+  ungroup()
+
+# Replicate rows based on each trait's rating
+terrier_traits_long <- terrier_traits_long %>%  
+  group_by(breed,trait) %>% 
+  slice(rep(1:n(), each = rating)) %>% 
+  ungroup()  
+
+# Create a second id to show total no. of bones for each trait's rating
+terrier_traits_long <- terrier_traits_long %>% 
+  group_by(breed) %>% 
+  mutate(id2 = seq(from = 0, by = 0.22, length.out = n()))
+```
+
+```{r}
+# --- Label data for geom_text()
+
+# Extract middle element of each group
+label_data <- terrier_traits_long %>% group_by(breed, trait) %>% slice(ceiling(n()/2)) %>% ungroup()
+
+# Control angle in plot
+label_data <- label_data %>% mutate(angle = case_when(
+  trait == "Personable" ~ 20,
+  trait == "Affectionate" ~ -80,
+  trait == "Child-friendly" ~ 15,
+  trait == "Dog-friendly" ~ 100
+))
+```
+
+```{r}
+# Create data to plot geom_segment
+df <- tibble(y = seq(from = 1, to = 4, by = 1))
+```
+
+```{r, message=FALSE}
+library(showtext)
+sysfonts::font_add_google(name = "Dancing Script", family = "Bold 700")
+showtext_opts(dpi = 120)
+showtext_auto(enable = TRUE)
+```
+
+```{r}
+terrier_traits_long <- terrier_traits_long %>% 
+  mutate(fill = case_when(
+    trait == "Affectionate" ~ "#c04b3f",
+    trait == "Child-friendly" ~ "#93ac68",
+    trait == "Dog-friendly" ~ "#9c53a8",
+    trait == "Personable" ~ "#b78e3e",
+  ))
+```
+
+
+```{r}
+# Create plot for each breed (no trait name)
+plot_terrier <- function(breed){
+
+  # Filter to specific breed
+  terrier_traits_long <- terrier_traits_long %>% filter(breed == {{breed}})
+  
+  # --- Plot
+  terrier_traits_long %>%
+    ggplot() +
+    # Base layer
+    geom_segment(data = df, aes(x = 0, xend = 4, y = y, yend = y), colour = "white") +
+    # No. of bones relating to ratings
+    geom_image(aes(x = id + id2, y = 4, image = bone), size = 0.15, nudge_x = 0.5) +
+    # Dog breed
+    geom_image(aes(x = 0, y = 0, image = image), size = 0.5) +
+    # Dog breed name
+    geom_text(data = distinct(terrier_traits_long, breed), aes(x = -0.2, y = 0, label = {{breed}}), vjust = -8,
+              family = "Bold 700", size = 5) +
+    coord_polar() +
+    theme_void() 
+    
+  
+}
+
+plot_terrier("Yorkshire Terriers")
+```
+
+```{r}
+# Create main plot (includes legend)
+
+plot_terrier_main <- function(breed){
+
+  # Filter to specific breed
+  terrier_traits_long <- terrier_traits_long %>% filter(breed == {{breed}})
+  
+  # --- Plot
+  terrier_traits_long %>%
+    ggplot() +
+    # Base layer
+    geom_segment(data = df, aes(x = 0, xend = 4, y = y, yend = y), colour = "white") +
+    # Facilitate manually plotting legend (won't be shown in plot)
+    geom_tile(data = distinct(terrier_traits_long, trait), aes(x = 0, y = 0, fill = trait)) +
+    # No. of bones relating to ratings
+    geom_image(aes(x = id + id2, y = 4, image = bone), size = 0.15, nudge_x = 0.5) +
+    # Dog breed
+    geom_image(aes(x = 0, y = 0, image = image), size = 0.5) +
+    # Dog breed name
+    geom_text(data = distinct(terrier_traits_long, breed), aes(x = -0.2, y = 0, label = {{breed}}), vjust = -7.5,
+              family = "Bold 700", size = 5) +
+    coord_polar() +
+    theme_void() +
+    # Themes, scales etc.
+    scale_fill_manual(name = "Trait",
+                      values = c("Affectionate" = "#c04b3f",
+                                 "Child-friendly" = "#93ac68",
+                                 "Dog-friendly" = "#9c53a8",
+                                 "Personable" = "#b78e3e")) +
+    theme(legend.position = "bottom")
+    
+  
+}
+
+plot_terrier_main("West Highland White Terriers")
+```
+
+
+```{r}
+# Plot top 10 dogs (excluding Westies)
+top_10 <- terrier_traits_long %>% filter(breed != "West Highland White Terriers")
+
+# Arrange top 10 dogs by rank
+top_10 <- breed_rank %>% 
+  select(breed, rank_2020) %>% 
+  right_join(top_10, by = "breed") %>% 
+  arrange(rank_2020)
+
+for (i in 1:10){
+  
+  assign(paste0("p", i),
+         plot_terrier(unique(top_10$breed)[i]),
+         envir = .GlobalEnv)
+}
+```
+
+```{r}
+main <- plot_terrier_main("West Highland White Terriers")
+```
+
+```{r, eval=FALSE}
+library(patchwork)
+
+layout <- "
+AABCD
+AAEFG
+AAHIJ
+" 
+
+main + p1 + p2 + p3 + p4 + p5 + p6 + p7 + p8 + p9 +
+  plot_layout(design = layout)
+```
+
+
+
+
+
+```{r, eval=FALSE}
+# Extract middle element of each group
+label_data <- terrier_traits_long %>% group_by(breed, trait) %>% slice(ceiling(n()/2)) %>% ungroup()
+
+# Control angle in plot
+label_data <- label_data %>% mutate(
+  angle = case_when(
+    trait == "Personable" ~ 0, 
+    trait == "Affectionate" ~ -90,
+    trait == "Child-friendly" ~ 0,
+    trait == "Dog-friendly" ~ 90
+  ),
+  hjust = case_when(
+    trait == "Personable" ~ -0.5, 
+    trait == "Affectionate" ~ -0.5,
+    trait == "Child-friendly" ~ 1.2,
+    trait == "Dog-friendly" ~ -0.5
+  ),
+  vjust = case_when(
+    trait == "Personable" ~ -1, 
+    trait == "Affectionate" ~ -0.5,
+    trait == "Child-friendly" ~ 0,
+    trait == "Dog-friendly" ~ 2 
+  )
+) 
+  
+
+# Create plot that includes trait name
+plot_terrier_main <- function(breed){
+  
+  label_data <- label_data %>% filter(breed == {{breed}})
+  
+  plot_terrier({{breed}}) + 
+    geom_text(data = label_data, aes(x = id + id2, y = 4 - 0.6, label = trait),
+              size = 3, 
+              angle = label_data$angle,
+              hjust = label_data$hjust,
+              vjust = label_data$vjust) 
+  
+}
+
+plot_terrier_main("West Highland White Terriers")
+```
