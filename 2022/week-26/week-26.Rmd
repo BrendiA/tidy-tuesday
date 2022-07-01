@@ -1,0 +1,205 @@
+---
+title: "Untitled"
+author: "Brendi Ang"
+date: '2022-06-28'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+```
+
+```{r}
+# Read-in data
+tuesdata <- tidytuesdayR::tt_load(2022, week = 26)
+paygap <- tuesdata$paygap
+```
+
+```{r}
+# Create new rows for each SIC code
+paygap_all <- paygap %>% 
+  mutate(sic_codes = strsplit(sic_codes, ":")) %>% 
+  unnest(sic_codes) %>% 
+  arrange(employer_id)
+
+# Filter to SIC codes with 5 digits & remove missing SIC codes
+paygap_all <- paygap_all %>% 
+  filter(str_count(sic_codes) == 5) %>% 
+  # add year of submission
+  mutate(year = year(date_submitted))
+
+# Include section code
+paygap_all <- paygap_all %>%
+  mutate(section = str_sub(sic_codes, start = 1L, end = 2L)) %>%
+  # remove dormant companies
+  filter(section != 99) %>% 
+  mutate(
+    section_code = case_when(
+      between(section, 10, 33) ~ "C",
+      section == 35 ~ "D",
+      between(section, 36, 39) ~ "E",
+      between(section, 41, 43) ~ "F",
+      between(section, 45, 47) ~ "G",
+      between(section, 49, 53) ~ "H",
+      between(section, 55, 56) ~ "I",
+      between(section, 58, 63) ~ "J",
+      between(section, 64, 66) ~ "K",
+      section == 68 ~ "L",
+      between(section, 69, 75) ~ "M",
+      between(section, 77, 82) ~ "N",
+      section == 84 ~ "O",
+      section == 85 ~ "P",
+      between(section, 86, 88) ~ "Q",
+      between(section, 90, 93) ~ "R",
+      between(section, 94, 96) ~ "S",
+      between(section, 97, 98) ~ "T",
+    )
+  )
+
+# Section description - see https://resources.companieshouse.gov.uk/sic/
+section_desc <- 
+  c(
+    C = "Manufacturing",
+    D = "Electricity, gas, steam and air conditioning supply",
+    E = "Water supply, sewerage, waste management and remediation activities",
+    `F` = "Construction",
+    G = "Wholesale and retail trade; repair of motor vehicles and motorcycles",
+    H = "Transportation and storage",
+    I = "Accommodation and food service activities",
+    J = "Information and communication",
+    K = "Financial and insurance activities",
+    L = "Real estate activities",
+    M = "Professional, scientific and technical activities",
+    N = "Administrative and support service activities",
+    O = "Public administration and defence; compulsory social security",
+    P = "Education",
+    Q = "Human health and social work activities",
+    R = "Arts, entertainment and recreation",
+    S = "Other service activities",
+    `T` = "Activities of households as employers; undifferentiated goods- and services-producing activities of households for own use"
+  )
+
+# Set section description as tibble to facilitate joining
+section_desc_df <- 
+  tibble(section_code = names(section_desc), 
+         section_desc = section_desc)
+
+# Join paygap and section description data frames
+paygap_all <- paygap_all %>% 
+  left_join(section_desc_df, by = "section_code")
+```
+
+```{r}
+# Average proportion of female or male in a given hourly pay quarter
+pay_quartile <-
+  paygap_all %>% 
+  # select six section codes
+  filter(section_code %in% c("J", "K", "M", "P", "Q", "R")) %>% 
+  pivot_longer(cols = male_lower_quartile:female_top_quartile,
+               names_to = "quartile",
+               values_to = "percent") %>% 
+  group_by(quartile, year, section_code, section_desc) %>% 
+  summarise(mean_percent = mean(percent, na.rm = TRUE),
+            .groups = "drop") %>% 
+  # separate gender and quartile
+  mutate(
+    gender = str_extract(quartile, pattern = "[^_]+"),
+    quartile = str_extract(quartile, pattern = "(?<=female_|male_).+")
+    ) %>%
+  mutate(
+    quartile = factor(quartile, 
+                      levels = c("lower_quartile", 
+                                 "lower_middle_quartile",
+                                 "upper_middle_quartile",
+                                 "top_quartile"),
+                      labels = c("Lower quartile", 
+                                 "Lower middle quartile",
+                                 "Upper middle quartile",
+                                 "Top quartile"))
+    ) 
+
+# Create wide format for line range plot
+pay_quartile_wide <-
+  pay_quartile %>% 
+  pivot_wider(names_from = gender,
+              values_from = mean_percent) %>% 
+  mutate(col = if_else(female > male, "#EDA5CD", "#9AC7E8"))
+```
+
+```{r}
+library(showtext)
+sysfonts::font_add_google(name = "Lato", family = "Black 900 Italic")
+sysfonts::font_add_google(name = "Lato", family = "Regular 400")
+sysfonts::font_add_google(name = "Roboto", family = "Bold 700")
+showtext_opts(dpi = 300)
+showtext_auto(enable = TRUE)
+```
+
+```{r}
+pay_quartile %>% 
+  ggplot(aes(x = year)) +
+  geom_ribbon(data = pay_quartile_wide,
+              aes(
+                x = year,
+                ymin = female,
+                ymax = male
+                ), 
+              fill = "white",
+              alpha = 0.3) +
+  geom_linerange(data = pay_quartile_wide,
+                 aes(
+                   x = year,
+                   ymin = female,
+                   ymax = male),
+                 colour = "grey40",
+                 size = 1.5) +
+  geom_hline(yintercept = 50,
+             colour = "black",
+             linetype = "dotted") +
+  geom_point(aes(y = mean_percent,
+                 colour = gender),
+             size = 2.5,
+             alpha = 0.8) +
+  facet_grid(section_desc ~ quartile,
+             switch = "y",
+             labeller = labeller(section_desc = label_wrap_gen(15))
+             ) +
+  scale_colour_manual(values = c("#e36a32", "#332188"),
+                      labels = c("Female", "Male")) +
+  scale_y_continuous(labels = ~ scales::label_percent(scale = 1)(.x),
+                     position = "right",
+                     breaks = 50
+                     ) +
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Regular 400"),
+    axis.text.x = element_text(angle = 90, size = 8, face = "bold"),
+    axis.text.y = element_text(size = 10),
+    axis.title.x = element_text(size = 6),
+    panel.spacing.x = unit(2, "lines"),
+    panel.spacing.y = unit(1, "lines"),
+    panel.grid = element_blank(),
+    plot.background = element_rect(fill = "#cedee7"),
+    plot.title = element_text(size = 16, hjust = 0.5, family = "Black 900 Italic", face = "bold"),
+    plot.subtitle = element_text(size = 12, hjust = 0.5, family = "Black 900 Italic", face = "bold"),
+    strip.text.y.left = element_text(angle = 0, size = 10, family = "Regular 400", face = "bold"),
+    strip.text.x = element_text(size = 12, family = "Bold 700", face = "italic"),
+    legend.title = element_blank(),
+    legend.position = "bottom",
+    plot.caption = element_text(hjust = 1.1)
+        ) +
+  labs(title = "Average proportion of females/males in an hourly pay quarter",
+       subtitle = "by UK SIC code sections",
+       x = "",
+       y = "",
+       caption= "Source: gender-pay-gap.service.gov.uk | #TidyTuesday 2022 week 26") 
+```
+
+```{r, eval=FALSE}
+ggsave("week-26-plot.png", width = 10, height = 10, units = "in")
+```
+
+
