@@ -4,6 +4,10 @@ My contributions to the #TidyTuesday challenge. More information about the chall
 
 ### Contributions
 
+[2022 week 26: UK gender pay gap](https://github.com/BrendiA/tidy-tuesday/tree/main/2022/week-26)
+
+![](https://raw.githubusercontent.com/BrendiA/tidy-tuesday/main/2022/week-26/week-26-plot.png)
+
 ---
 
 [2022 week 05: Dog breeds](https://github.com/BrendiA/tidy-tuesday/tree/main/2022/week-05)
