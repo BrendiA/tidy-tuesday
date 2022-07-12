@@ -112,26 +112,26 @@ yrange <- range(avg_sqft$ymin, avg_sqft$ymax)
 ratioxy <- diff(xrange) / diff(yrange)
 
 mapping1 <- aes(
-  x, y, scale,ratioxy, 
-  angleofneck, angleofspine,
+  x, y, scale, ratioxy, angleofspine, 
   anglelefthumerus, anglerighthumerus,
   angleleftradius, anglerightradius,
-  angleleftleg, anglerightleg
+  angleleftleg, anglerightleg,
+  angleofneck
   )
 
 small_man <- data.frame(
   x = avg_sqft$xmin + 1,
   y = avg_sqft$ymin + 6,
-  scale = 1.95,
+  scale = 1.90,
   ratioxy = ratioxy,
   angleofspine = -pi / 2,
-  angleofneck = -pi/2,
-  anglelefthumerus = 4*pi / 3,
-  anglerighthumerus = 5*pi / 3,
-  angleleftradius = 4*pi/3,
-  anglerightradius = 5*pi / 3,
-  angleleftleg = 4*pi/3,
-  anglerightleg = 5*pi/3
+  angleofneck = - pi / 2,
+  anglelefthumerus = 4 * pi / 3,
+  anglerighthumerus = 5 * pi / 3,
+  angleleftradius = 4 * pi / 3,
+  anglerightradius = 5 * pi / 3,
+  angleleftleg = 4 * pi / 3,
+  anglerightleg = 5 * pi / 3
   )  
 ```
 
@@ -202,12 +202,11 @@ p1 <- ggplot(data = avg_sqft) +
 
 ```{r}
 mapping2 <- aes(
-  x, y, scale, ratioxy,
-  angleofspine, angleofneck,
+  x, y, scale, ratioxy, angleofspine, 
   anglelefthumerus, anglerighthumerus,
   angleleftradius, anglerightradius,
   angleleftleg, anglerightleg,
-  size = 5
+  angleofneck, size = 5
   )
 
 large_man <- data.frame(
@@ -215,16 +214,18 @@ large_man <- data.frame(
   y = 4.9,
   scale = 1.95,
   ratioxy = ratioxy,
-  angleofspine = -pi / 2,
-  angleofneck = -pi/2,
-  anglelefthumerus = 4*pi/3,
-  anglerighthumerus = 4.7*pi/3,
-  angleleftradius = 2*pi / 3,
-  anglerightradius = 4.7*pi/3,
-  angleleftleg = 4*pi/3,
-  anglerightleg = 5*pi/3
-  )
+  angleofspine = - pi / 2,
+  angleofneck = - pi / 2,
+  anglelefthumerus = 4 * pi / 3,
+  anglerighthumerus = 4.7 * pi / 3,
+  angleleftradius = 2 * pi / 3,
+  anglerightradius = 4.7 * pi / 3,
+  angleleftleg = 4 * pi / 3,
+  anglerightleg = 5 * pi / 3
+)
+```
 
+```{r}
 p2 <- ggplot() +
   xkcdman(data = large_man,
           mapping = mapping2) +
@@ -249,9 +250,9 @@ p2 <- ggplot() +
   geom_text(aes(x = -0.05,
                 y = 7.5,
                 label = str_wrap(
-                "I'm about 5 ft 8 and can be used as a guide. The dataset is from
-                Kate Pennington and data.sfgov.org.",
-                width = 40),
+                "I'm about 5 ft 8 and can be used as a guide. The dataset is 
+                provided by Kate Pennington and data.sfgov.org.",
+                width = 35),
                 family = "Handlee",
                 size = 5.2)) +
   theme_void() +
@@ -260,6 +261,7 @@ p2 <- ggplot() +
   guides(colour = "none",
          size = "none") +
   theme(aspect.ratio = 1) 
+p2
 ```
 
 ```{r}
