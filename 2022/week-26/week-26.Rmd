@@ -195,7 +195,7 @@ pay_quartile %>%
        subtitle = "by UK SIC code sections",
        x = "",
        y = "",
-       caption= "Source: gender-pay-gap.service.gov.uk | #TidyTuesday 2022 week 26") 
+       caption = "Source: gender-pay-gap.service.gov.uk | #TidyTuesday 2022 week 26") 
 ```
 
 ```{r, eval=FALSE}
