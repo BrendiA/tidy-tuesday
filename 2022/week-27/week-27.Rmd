@@ -1,0 +1,285 @@
+---
+title: "Week 27"
+author: "Brendi Ang"
+date: '2022-07-05'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(xkcd)
+library(extrafont)
+```
+
+```{r}
+# Read-in data
+tuesdata <- tidytuesdayR::tt_load(2022, week = 27)
+rent <- tuesdata$rent
+```
+
+```{r}
+# Compute number of square feet per $1,000
+rent <- rent %>% 
+  filter(!is.na(sqft)) %>% 
+  mutate(sqft_per1000 = (sqft / price) * 1000)
+
+# Compute average square feet per $1,000 per year & county
+avg_sqft <- rent %>% 
+  group_by(year, county) %>% 
+  summarise(avg_sqft_per1000 = mean(sqft_per1000),
+            .groups = "drop")
+
+# Select year 2012 & 2018 and counties with more observations
+avg_sqft <- avg_sqft %>% 
+  filter(year %in% c(2012, 2018)) %>% 
+  mutate(county = str_to_title(county)) %>% 
+  filter(county %in% c("Alameda", "Contra Costa",
+                       "San Francisco", "San Mateo",
+                       "Santa Clara"
+                       ))
+```
+
+```{r}
+# --- Shape and county labels
+
+# Compute length/height of square
+avg_sqft <- avg_sqft %>% 
+  mutate(side = sqrt(avg_sqft_per1000)) %>% 
+  arrange(year, side)
+  
+# Compute of squares for 2012
+avg_sqft2012 <- avg_sqft %>% 
+  filter(year == 2012) %>% 
+  arrange(avg_sqft_per1000) %>%
+  # Add squares
+  mutate(
+    ymin = cumsum(lag(side + 10, default = 0)), 
+    ymax = ymin + side,
+    xmin = 0,
+    xmax = side
+    ) %>% 
+  # Add x-coordinate for county labels
+  mutate(label_x = (xmax - xmin) / 2)
+  
+# Compute of squares for 2012 (dependent on the values of avg_sqft2012)
+avg_sqft2018 <- avg_sqft %>% 
+  filter(year == 2018) %>% 
+  arrange(avg_sqft_per1000) %>% 
+  mutate(
+    xmin = max(avg_sqft2012$side) + 20, # 10 sqft to separate the years apart
+    xmax = xmin + side,
+    ymin = avg_sqft2012$ymin,
+    ymax = ymin + side
+  ) %>% 
+  # Add x-coordinate for county labels
+  mutate(label_x = max(avg_sqft2012$xmax) + 20 + ((xmax - xmin) / 2))
+
+avg_sqft <- bind_rows(avg_sqft2012, avg_sqft2018)
+```
+
+```{r}
+# --- Year labels 
+
+# x-coordinate for year labels
+year_df2012 <- avg_sqft2012 %>% 
+  group_by(year) %>% 
+  summarise(year_x = (max(xmax) - 0) / 2)
+
+year_df2018 <- avg_sqft2018 %>% 
+  group_by(year) %>% 
+  summarise(year_x = max(avg_sqft2012$xmax) + 20 + (max(xmax) - unique(xmin)) / 2)
+
+year_df = bind_rows(year_df2012, year_df2018)
+```
+
+```{r}
+# --- Percentage change from 2012 to 2018
+
+avg_sqft_wide <- avg_sqft %>% 
+  select(year, county, avg_sqft_per1000) %>% 
+  pivot_wider(names_from = year,
+              values_from = avg_sqft_per1000,
+              names_prefix = "year") %>% 
+  mutate(percent_change = (year2018 - year2012) / year2012)
+```
+
+```{r}
+# --- Mapping for stick men
+xrange <- range(avg_sqft$xmin , avg_sqft$xmax)
+yrange <- range(avg_sqft$ymin, avg_sqft$ymax)
+ratioxy <- diff(xrange) / diff(yrange)
+
+mapping1 <- aes(
+  x, y, scale,ratioxy, 
+  angleofneck, angleofspine,
+  anglelefthumerus, anglerighthumerus,
+  angleleftradius, anglerightradius,
+  angleleftleg, anglerightleg
+  )
+
+small_man <- data.frame(
+  x = avg_sqft$xmin + 1,
+  y = avg_sqft$ymin + 6,
+  scale = 1.95,
+  ratioxy = ratioxy,
+  angleofspine = -pi / 2,
+  angleofneck = -pi/2,
+  anglelefthumerus = 4*pi / 3,
+  anglerighthumerus = 5*pi / 3,
+  angleleftradius = 4*pi/3,
+  anglerightradius = 5*pi / 3,
+  angleleftleg = 4*pi/3,
+  anglerightleg = 5*pi/3
+  )  
+```
+
+
+```{r}
+set.seed(9999)
+
+p1 <- ggplot(data = avg_sqft) +
+  # Shape 
+  xkcdrect(
+    data = avg_sqft,
+    aes(xmin = xmin,
+        xmax = xmax,
+        ymin = ymin,
+        ymax = ymax,
+        fill = county),
+    colour = "white") +
+  # Stickmen in each county
+  xkcdman(data = small_man,
+          mapping = mapping1) +
+  # Arrows
+  geom_curve(
+    data = avg_sqft2012,
+    aes(x = max(xmax) + 2,
+        xend = min(avg_sqft2018$xmin) - 3,
+        y = ((ymin + ymax) / 2),
+        yend = (avg_sqft2018$ymin + avg_sqft2018$ymax) / 2),
+    arrow = arrow(length = unit(0.1, "inches"), type = "closed"),
+    angle = 90,
+    curvature = -0.4) +
+  # Percentage change in square feet
+  geom_text(data = avg_sqft_wide,
+          aes(x = (min(avg_sqft2018$xmin) + max(avg_sqft2012$xmax)) / 2,
+              y = (avg_sqft2012$ymin + avg_sqft2012$ymax) / 2,
+              label = scales::label_percent(scale = 100)(percent_change)),
+          family = "Handlee") +
+  # County labels
+  geom_text(aes(x = label_x,
+                y = ymax + 3,
+                label = county),
+            family = "xkcd") +
+  # Year labels
+  geom_text(data = year_df,
+            aes(x = year_x,
+                y = max(avg_sqft$ymax) + 12,
+                label = year),
+            family = "xkcd",
+            size = 10,
+            colour = "#A90011",
+            fontface = "bold") +
+  # Square feet 
+  geom_text(aes(x = label_x,
+                y = (ymax + ymin) / 2,
+                label = scales::label_number(accuracy = 0.1, suffix = " sqft")(avg_sqft_per1000)
+                ),
+            colour = "white",
+            family = "xkcd",
+            size = 4) +
+  colorspace::scale_fill_discrete_qualitative(palette = "Harmonic") +
+  theme_void() +
+  theme(
+    text = element_text(family = "xkcd"),
+    plot.title = element_text(size = 20),
+    aspect.ratio = 1,
+    legend.position = "none"
+  )
+```
+
+```{r}
+mapping2 <- aes(
+  x, y, scale, ratioxy,
+  angleofspine, angleofneck,
+  anglelefthumerus, anglerighthumerus,
+  angleleftradius, anglerightradius,
+  angleleftleg, anglerightleg,
+  size = 5
+  )
+
+large_man <- data.frame(
+  x = 0,
+  y = 4.9,
+  scale = 1.95,
+  ratioxy = ratioxy,
+  angleofspine = -pi / 2,
+  angleofneck = -pi/2,
+  anglelefthumerus = 4*pi/3,
+  anglerighthumerus = 4.7*pi/3,
+  angleleftradius = 2*pi / 3,
+  anglerightradius = 4.7*pi/3,
+  angleleftleg = 4*pi/3,
+  anglerightleg = 5*pi/3
+  )
+
+p2 <- ggplot() +
+  xkcdman(data = large_man,
+          mapping = mapping2) +
+  # Eyes
+  geom_point(aes(x = c(-0.12, 0.12),
+                 y = 5.2),
+             size = 4) +
+  # Smile
+  geom_curve(aes(x = -0.1,
+                 xend = 0.08,
+                 y = 4.8,
+                 yend = 4.9),
+             size = 2) +
+  # Speech bubble
+  geom_curve(aes(x = -0.25,
+                 xend = -0.4,
+                 y = 6,
+                 yend = 6.7),
+             curvature = -0.2,
+             size = 0.7) +
+  # Quote
+  geom_text(aes(x = -0.05,
+                y = 7.5,
+                label = str_wrap(
+                "I'm about 5 ft 8 and can be used as a guide. The dataset is from
+                Kate Pennington and data.sfgov.org.",
+                width = 40),
+                family = "Handlee",
+                size = 5.2)) +
+  theme_void() +
+  coord_cartesian(xlim = c(-0.5, 0.5),
+                  ylim = c(2.5, 8)) +
+  guides(colour = "none",
+         size = "none") +
+  theme(aspect.ratio = 1) 
+```
+
+```{r}
+library(patchwork)
+
+layout <- "
+AAA##
+AAABB
+AAABB
+AAABB
+"
+
+wrap_plots(A = p1, B = p2, design = layout) +
+  plot_annotation(title = "On average, how much square feet can you get with $1,000?",
+                  subtitle = "Rentals in San Francisco") &
+  theme(text = element_text(family = "Handlee"),
+        plot.title = element_text(size = 20, face = "bold.italic"),
+        plot.subtitle = element_text(size = 16, face = "bold.italic"))
+```
+
+```{r, eval=FALSE}
+ggsave("week-27-plot.png", width = 10, height = 6, units = "in")
+```
