@@ -126,11 +126,13 @@ plot_list[[3]] + plot_list[[4]] +
   plot_annotation(
     title = "Commercial flight departures in the EU",
     subtitle = sub,
+    caption = "Source: Eurocontrol | #TidyTuesday Week 28",
     theme = theme(
       legend.position = "bottom",
       plot.title = element_text(family = "Black 900", hjust = 0.5, size = 18, face = "bold"),
       plot.subtitle = element_text(family = "Regular 400", hjust = 0.5, size = 14),
-      plot.background = element_rect(fill = "#f0f8ff")) 
+      plot.background = element_rect(fill = "#f0f8ff"),
+      plot.caption = element_text(family = "Regular 400", vjust = 1)) 
   )
 
 # ggsave("week-28-plot.png", width = 13, height = 11, units = "in")
