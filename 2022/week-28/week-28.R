@@ -53,9 +53,9 @@ create_df <- function(given_year) {
                               label = TRUE,
                               week_start = first_day_of_year)) %>%
     # Reverse order so 1 starts first in the calendar
-    mutate(day_of_week = forcats::fct_rev(day_of_week)) %>% 
+    # mutate(day_of_week = forcats::fct_rev(day_of_week)) %>% 
     group_by(month) %>%
-    mutate(week_of_month = dense_rank(week_of_year)) %>%
+    mutate(week_of_month = -1 * dense_rank(week_of_year)) %>%
     ungroup()
 }
 
@@ -66,7 +66,8 @@ plot_heatmap <- function(df){
   given_year <- unique(df$year)
   
   ggplot(data = df,
-         aes(x = week_of_month, y = day_of_week)) +
+         aes(x = day_of_week,
+             y = week_of_month)) +
     # Heat map
     geom_tile(aes(fill = total_dep)) +
     # Calendar days
@@ -95,7 +96,7 @@ plot_heatmap <- function(df){
       legend.key.width = unit(1.5, "cm"),
       legend.text = element_text(family = "Regular 400"),
       legend.title = element_text(vjust = 0.8, family = "Regular 400"),
-      panel.spacing.x = unit(0, "lines"),
+      panel.spacing.x = unit(0.5, "lines"),
       panel.grid = element_blank(),
       plot.title = element_text(hjust = 0.5, family = "Black 900 Italic", size = 12, face = "bold"),
       strip.text = element_text(family = "Regular 400", size = 8)
@@ -135,6 +136,6 @@ plot_list[[3]] + plot_list[[4]] +
       plot.caption = element_text(family = "Regular 400", vjust = 1)) 
   )
 
-# ggsave("week-28-plot.png", width = 13, height = 11, units = "in")
+ggsave("week-28-plot.png", width = 13, height = 11, units = "in")
 
 
