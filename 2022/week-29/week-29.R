@@ -178,28 +178,30 @@ eu_energy_long %>%
             family = "Regular 400",
             fontface = "bold") +
   # Paragraph 
-  geom_text(aes(x = -11.5, y = 65, label = context),
+  geom_text(aes(x = -9.5, y = 65, label = context),
             size = 4, 
             hjust = 0,
             stat = "unique", 
             family = "Regular 400",
             colour = "#262a77") +
   labs(title = "Share of renewable and nuclear energy in the European Union (EU) in 2020",
-       subtitle = "A 'donut' represents the gross output of electric energy") +
+       subtitle = "A 'donut' represents the gross output of electric energy",
+       caption = "Source: data.nber.org | #TidyTuesday Week 29") +
   guides(fill = guide_legend(byrow = TRUE)) + 
   theme(
     aspect.ratio = 1,
-    legend.position = c(0.225, 0.67),
-    legend.title = element_text(family = "Regular 400", face = "bold.italic", size = 13, hjust = 0),
+    legend.position = c(0.215, 0.67),
+    legend.title = element_text(family = "Regular 400", face = "bold.italic", size = 15, hjust = 0),
     legend.text = element_text(family = "Regular 400", size = 12, face = "bold"),
     legend.key.width = unit(4, "cm"),
     legend.key.height = unit(0.4, "cm"),
     text = element_text(colour = "#262a77"),
     plot.title = element_text(hjust = 0.5, vjust = -3, size = 20, family = "Bold 700", face = "bold"),
     plot.subtitle = element_text(hjust = 0.5, size = 16, vjust = -3, family = "Bold 700"),
+    plot.caption = element_text(hjust = 0.98, vjust = 5, size = 10),
     plot.background = element_rect(fill = "#d4ebf2")) 
 
 # Save as png file
 file <- here::here("2022/week-29/plot.png")
-ggsave(file, width = 10, height = 10)
+ggsave(file, width = 11, height = 11)
 knitr::plot_crop(file) # remove borders 
