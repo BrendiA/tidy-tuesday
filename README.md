@@ -4,6 +4,12 @@ My contributions to the #TidyTuesday challenge. More information about the chall
 
 ### Contributions
 
+[2022 week 29: Technology Adoption](https://github.com/BrendiA/tidy-tuesday/tree/main/2022/week-29)
+
+![](https://raw.githubusercontent.com/BrendiA/tidy-tuesday/main/2022/week-29/plot.png)
+
+---
+
 [2022 week 28: European flights](https://github.com/BrendiA/tidy-tuesday/tree/main/2022/week-28)
 
 ![](https://raw.githubusercontent.com/BrendiA/tidy-tuesday/main/2022/week-28/week-28-plot.png)
